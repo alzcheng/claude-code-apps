@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Manager</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    #header {
+      background: #16213e;
+      border-bottom: 2px solid #0f3460;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    #header h1 {
+      font-size: 1.4rem;
+      letter-spacing: 3px;
+      color: #e94560;
+      margin-right: auto;
+    }
+
+    .view-btn {
+      padding: 0.4rem 1rem;
+      font-size: 0.88rem;
+      border: 2px solid #0f3460;
+      background: #16213e;
+      color: #aaa;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .view-btn.active {
+      background: #0f3460;
+      border-color: #a8dadc;
+      color: #a8dadc;
+    }
+
+    .view-btn:hover:not(.active) {
+      border-color: #a8dadc;
+      color: #a8dadc;
+    }
+
+    #btn-export {
+      padding: 0.4rem 1rem;
+      font-size: 0.88rem;
+      background: #2d6a4f;
+      color: #eee;
+      border: 2px solid #2d6a4f;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #btn-export:hover { background: #1b4332; border-color: #1b4332; }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      background: #16213e;
+      padding: 0.6rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    #btn-add-task {
+      padding: 0.4rem 1rem;
+      font-size: 0.88rem;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #btn-add-task:hover { background: #c73652; }
+
+    #status-filter {
+      padding: 0.38rem 0.75rem;
+      font-size: 0.88rem;
+      background: #0f3460;
+      color: #eee;
+      border: 1px solid #a8dadc;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #search-input {
+      padding: 0.38rem 0.75rem;
+      font-size: 0.88rem;
+      background: #0f3460;
+      color: #eee;
+      border: 1px solid #a8dadc;
+      border-radius: 8px;
+      outline: none;
+      width: 200px;
+    }
+
+    #search-input::placeholder { color: #888; }
+
+    /* Gantt zoom buttons */
+    #gantt-zoom {
+      display: none;
+      align-items: center;
+      gap: 0.4rem;
+      margin-left: auto;
+    }
+
+    #gantt-zoom button {
+      width: 28px; height: 28px;
+      font-size: 1.1rem;
+      background: #0f3460;
+      color: #a8dadc;
+      border: 1px solid #a8dadc;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #gantt-zoom button:hover { background: #1a3a6e; }
+    #gantt-zoom span { font-size: 0.82rem; color: #888; }
+
+    /* ── Main area ── */
+    #main {
+      flex: 1;
+      overflow: auto;
+      padding: 0;
+    }
+
+    /* ── List View ── */
+    #list-view { width: 100%; }
+
+    #list-view table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    #list-view thead tr {
+      background: #0f3460;
+      color: #a8dadc;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+    }
+
+    #list-view th {
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    #list-view td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid #1a1a2e;
+      vertical-align: middle;
+    }
+
+    #list-view tbody tr {
+      background: #16213e;
+      transition: background 0.15s;
+    }
+
+    #list-view tbody tr:hover { background: #1c2a4a; }
+
+    .task-name-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .collapse-btn {
+      background: none;
+      border: none;
+      color: #a8dadc;
+      cursor: pointer;
+      font-size: 0.8rem;
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+      padding: 0;
+    }
+
+    .collapse-placeholder { width: 18px; flex-shrink: 0; }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge-todo       { background: #0f3460; color: #a8dadc; }
+    .badge-in-progress{ background: #a8dadc; color: #16213e; }
+    .badge-done       { background: #2d6a4f; color: #d8f3dc; }
+    .badge-blocked    { background: #e94560; color: #fff; }
+
+    .dep-chip {
+      display: inline-block;
+      background: #0f3460;
+      color: #a8dadc;
+      font-size: 0.72rem;
+      padding: 1px 6px;
+      border-radius: 8px;
+      margin: 1px;
+    }
+
+    .row-action-btn {
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-right: 3px;
+    }
+
+    .row-action-btn:hover { opacity: 0.8; }
+
+    .btn-edit    { background: #0f3460; border-color: #a8dadc; color: #a8dadc; }
+    .btn-add-sub { background: #1a1a2e; border-color: #888;    color: #aaa; }
+    .btn-del     { background: #3a0a15; border-color: #e94560; color: #e94560; }
+
+    /* ── Gantt View ── */
+    #gantt-view { display: none; }
+
+    #gantt-scroll {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: calc(100vh - 120px);
+    }
+
+    #gantt-svg {
+      display: block;
+    }
+
+    /* ── Modal ── */
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #modal-overlay.open { display: flex; }
+
+    #modal {
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 560px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    #modal h2 {
+      font-size: 1.1rem;
+      color: #a8dadc;
+      margin-bottom: 1.2rem;
+      letter-spacing: 1px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 0.9rem;
+      flex-wrap: wrap;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 130px;
+    }
+
+    .form-group label {
+      font-size: 0.78rem;
+      color: #a8dadc;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input,
+    .form-group select {
+      padding: 0.45rem 0.65rem;
+      background: #0f3460;
+      color: #eee;
+      border: 1px solid #a8dadc;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      outline: none;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: #e94560;
+    }
+
+    #dep-select {
+      height: 90px;
+    }
+
+    #dep-select option { padding: 3px 0; }
+
+    .modal-actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+      margin-top: 1.2rem;
+    }
+
+    .btn-save {
+      padding: 0.5rem 1.4rem;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+
+    .btn-save:hover { background: #c73652; }
+
+    .btn-cancel {
+      padding: 0.5rem 1.2rem;
+      background: #0f3460;
+      color: #aaa;
+      border: 1px solid #aaa;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+
+    .btn-cancel:hover { background: #16213e; }
+
+    .btn-delete-modal {
+      padding: 0.5rem 1.2rem;
+      background: #3a0a15;
+      color: #e94560;
+      border: 1px solid #e94560;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+      margin-right: auto;
+    }
+
+    .btn-delete-modal:hover { background: #5a1020; }
+
+    #form-error {
+      color: #e94560;
+      font-size: 0.82rem;
+      margin-top: 0.4rem;
+      display: none;
+    }
+
+    /* ── Empty state ── */
+    #empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: #555;
+    }
+
+    #empty-state p { font-size: 1rem; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1a1a2e; }
+    ::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a8dadc; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <h1>PROJECT MANAGER</h1>
+  <button class="view-btn active" id="btn-list-view">&#9776; List View</button>
+  <button class="view-btn" id="btn-gantt-view">&#9632; Gantt View</button>
+  <button id="btn-export">&#11015; Export Excel</button>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <button id="btn-add-task">+ Add Task</button>
+  <select id="status-filter">
+    <option value="">All Statuses</option>
+    <option value="todo">Not Started</option>
+    <option value="in-progress">In Progress</option>
+    <option value="done">Done</option>
+    <option value="blocked">Blocked</option>
+  </select>
+  <input id="search-input" type="text" placeholder="Search tasks...">
+  <div id="gantt-zoom">
+    <button id="btn-zoom-out">&#8722;</button>
+    <span id="zoom-label">28px/day</span>
+    <button id="btn-zoom-in">&#43;</button>
+  </div>
+</div>
+
+<!-- Main content area -->
+<div id="main">
+
+  <!-- List View -->
+  <div id="list-view">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:32%">Task Name</th>
+          <th style="width:11%">Assignee</th>
+          <th style="width:10%">Start</th>
+          <th style="width:10%">End</th>
+          <th style="width:10%">Status</th>
+          <th style="width:12%">Depends On</th>
+          <th style="width:15%">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="list-body"></tbody>
+    </table>
+    <div id="empty-state" style="display:none">
+      <p>No tasks yet. Click <strong>+ Add Task</strong> to get started.</p>
+    </div>
+  </div>
+
+  <!-- Gantt View -->
+  <div id="gantt-view">
+    <div id="gantt-scroll">
+      <svg id="gantt-svg"></svg>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h2 id="modal-title">Add Task</h2>
+    <div class="form-row">
+      <div class="form-group" style="flex:2; min-width:200px">
+        <label>Task Name *</label>
+        <input type="text" id="field-name" placeholder="Enter task name">
+      </div>
+      <div class="form-group">
+        <label>Assignee</label>
+        <input type="text" id="field-assignee" placeholder="Name">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Start Date *</label>
+        <input type="date" id="field-start">
+      </div>
+      <div class="form-group">
+        <label>End Date *</label>
+        <input type="date" id="field-end">
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="field-status">
+          <option value="todo">Not Started</option>
+          <option value="in-progress">In Progress</option>
+          <option value="done">Done</option>
+          <option value="blocked">Blocked</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Dependencies (hold Ctrl/Cmd to multi-select)</label>
+        <select id="dep-select" multiple></select>
+      </div>
+    </div>
+    <div id="form-error"></div>
+    <div class="modal-actions">
+      <button class="btn-delete-modal" id="btn-delete-modal" style="display:none">Delete Task</button>
+      <button class="btn-cancel" id="btn-cancel-modal">Cancel</button>
+      <button class="btn-save" id="btn-save-modal">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  STATE & CONSTANTS
+// ═══════════════════════════════════════════════════
+const LS_KEY = 'pm_tasks';
+let tasks = [];
+let _counter = 0;
+let currentView = 'list';
+let pxPerDay = 28;
+let modalMode = null;   // 'add' | 'edit'
+let modalParentId = null;
+let modalEditId = null;
+
+// ═══════════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════════
+function genId() {
+  return 't_' + Date.now() + '_' + (++_counter);
+}
+
+function daysBetween(startISO, endISO) {
+  const s = new Date(startISO + 'T00:00:00');
+  const e = new Date(endISO   + 'T00:00:00');
+  return Math.max(0, Math.round((e - s) / 86400000));
+}
+
+function addDays(dateISO, n) {
+  const d = new Date(dateISO + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getTask(id) { return tasks.find(t => t.id === id); }
+
+function getChildren(parentId) {
+  return tasks.filter(t => t.parentId === parentId)
+              .sort((a, b) => a.order - b.order);
+}
+
+function getAllDescendantIds(id) {
+  const ids = [];
+  const stack = [id];
+  while (stack.length) {
+    const cur = stack.pop();
+    getChildren(cur).forEach(c => { ids.push(c.id); stack.push(c.id); });
+  }
+  return ids;
+}
+
+function getDepth(task) {
+  let depth = 0, cur = task;
+  while (cur.parentId) {
+    depth++;
+    cur = getTask(cur.parentId);
+    if (!cur) break;
+  }
+  return depth;
+}
+
+function getProjectDateRange() {
+  const dated = tasks.filter(t => t.startDate && t.endDate);
+  if (!dated.length) {
+    const today = todayISO();
+    return { minDate: today, maxDate: addDays(today, 30) };
+  }
+  const starts = dated.map(t => t.startDate);
+  const ends   = dated.map(t => t.endDate);
+  const minDate = starts.reduce((a, b) => a < b ? a : b);
+  const maxDate = ends.reduce((a, b)   => a > b ? a : b);
+  return {
+    minDate: addDays(minDate, -7),
+    maxDate: addDays(maxDate, 7)
+  };
+}
+
+function statusLabel(s) {
+  return { todo: 'Not Started', 'in-progress': 'In Progress', done: 'Done', blocked: 'Blocked' }[s] || s;
+}
+
+function statusBadgeClass(s) {
+  return { todo: 'badge-todo', 'in-progress': 'badge-in-progress', done: 'badge-done', blocked: 'badge-blocked' }[s] || 'badge-todo';
+}
+
+function barColor(s) {
+  return { todo: '#0f3460', 'in-progress': '#a8dadc', done: '#2d6a4f', blocked: '#e94560' }[s] || '#0f3460';
+}
+
+// ═══════════════════════════════════════════════════
+//  PERSISTENCE
+// ═══════════════════════════════════════════════════
+function saveState() {
+  localStorage.setItem(LS_KEY, JSON.stringify(tasks));
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      tasks = JSON.parse(raw);
+      // ensure required fields
+      tasks.forEach(t => {
+        if (!t.dependsOn) t.dependsOn = [];
+        if (t.collapsed === undefined) t.collapsed = false;
+        if (t.order === undefined) t.order = 0;
+      });
+      return;
+    }
+  } catch(e) { /* ignore */ }
+  tasks = getSampleTasks();
+  saveState();
+}
+
+// ═══════════════════════════════════════════════════
+//  SAMPLE DATA
+// ═══════════════════════════════════════════════════
+function getSampleTasks() {
+  const today = todayISO();
+  const t = (offset) => addDays(today, offset);
+
+  const id1 = 't_1001', id2 = 't_1002', id3 = 't_1003';
+  const id4 = 't_1004', id5 = 't_1005', id6 = 't_1006', id7 = 't_1007';
+
+  return [
+    { id: id1, parentId: null, name: 'Discovery & Planning', assignee: 'Alice', startDate: t(-14), endDate: t(-7),  status: 'done',        dependsOn: [],       collapsed: false, order: 0 },
+    { id: id2, parentId: id1,  name: 'Requirements Gathering', assignee: 'Alice', startDate: t(-14), endDate: t(-10), status: 'done',       dependsOn: [],       collapsed: false, order: 0 },
+    { id: id3, parentId: id1,  name: 'Scope Definition',      assignee: 'Bob',   startDate: t(-10), endDate: t(-7),  status: 'done',       dependsOn: [id2],    collapsed: false, order: 1 },
+    { id: id4, parentId: null, name: 'Design Phase',          assignee: 'Carol', startDate: t(-6),  endDate: t(1),   status: 'in-progress', dependsOn: [id1],   collapsed: false, order: 1 },
+    { id: id5, parentId: id4,  name: 'UI Wireframes',        assignee: 'Carol', startDate: t(-6),  endDate: t(-2),  status: 'done',        dependsOn: [],       collapsed: false, order: 0 },
+    { id: id6, parentId: id4,  name: 'Visual Design',        assignee: 'Dan',   startDate: t(-1),  endDate: t(1),   status: 'in-progress', dependsOn: [id5],   collapsed: false, order: 1 },
+    { id: id7, parentId: null, name: 'Development Sprint 1', assignee: 'Eve',   startDate: t(2),   endDate: t(16),  status: 'todo',        dependsOn: [id4],   collapsed: false, order: 2 },
+  ];
+}
+
+// ═══════════════════════════════════════════════════
+//  CRUD
+// ═══════════════════════════════════════════════════
+function addTask(data) {
+  const siblings = tasks.filter(t => t.parentId === (data.parentId || null));
+  const order = siblings.length ? Math.max(...siblings.map(s => s.order)) + 1 : 0;
+  const task = {
+    id: genId(),
+    parentId: data.parentId || null,
+    name: data.name,
+    assignee: data.assignee || '',
+    startDate: data.startDate,
+    endDate: data.endDate,
+    status: data.status || 'todo',
+    dependsOn: data.dependsOn || [],
+    collapsed: false,
+    order
+  };
+  tasks.push(task);
+  saveState();
+  render();
+}
+
+function updateTask(id, data) {
+  const t = getTask(id);
+  if (!t) return;
+  Object.assign(t, data);
+  saveState();
+  render();
+}
+
+function deleteTask(id) {
+  const toDelete = [id, ...getAllDescendantIds(id)];
+  tasks = tasks.filter(t => !toDelete.includes(t.id));
+  // clean up dependsOn references
+  tasks.forEach(t => {
+    t.dependsOn = t.dependsOn.filter(d => !toDelete.includes(d));
+  });
+  saveState();
+  render();
+}
+
+// ═══════════════════════════════════════════════════
+//  FLATTENED DISPLAY ORDER (for list & gantt)
+// ═══════════════════════════════════════════════════
+function getFlattenedDisplay(statusFilter, search) {
+  const q = (search || '').toLowerCase();
+  const result = [];
+
+  function walk(parentId, hidden) {
+    const children = getChildren(parentId);
+    children.forEach(task => {
+      const matchesSearch = !q || task.name.toLowerCase().includes(q);
+      const matchesStatus = !statusFilter || task.status === statusFilter;
+      const visible = !hidden && matchesSearch && matchesStatus;
+      if (!hidden && matchesSearch && matchesStatus) {
+        result.push(task);
+      }
+      // If we have search or filter active, show children regardless of collapse
+      const collapseHide = task.collapsed && !q && !statusFilter;
+      walk(task.id, hidden || collapseHide || (!matchesSearch && !q) && false);
+    });
+  }
+
+  // More accurate walk: show matched items and their ancestors
+  if (q || statusFilter) {
+    // First, find all matching tasks
+    const matchingIds = new Set();
+    tasks.forEach(t => {
+      const matchSearch = !q || t.name.toLowerCase().includes(q);
+      const matchStat   = !statusFilter || t.status === statusFilter;
+      if (matchSearch && matchStat) {
+        matchingIds.add(t.id);
+        // add ancestors
+        let cur = t;
+        while (cur.parentId) {
+          matchingIds.add(cur.parentId);
+          cur = getTask(cur.parentId);
+          if (!cur) break;
+        }
+      }
+    });
+    // Flatten in order
+    function walkFiltered(parentId) {
+      getChildren(parentId).forEach(task => {
+        if (matchingIds.has(task.id)) {
+          result.push(task);
+          walkFiltered(task.id);
+        }
+      });
+    }
+    walkFiltered(null);
+  } else {
+    function walkNormal(parentId) {
+      getChildren(parentId).forEach(task => {
+        result.push(task);
+        if (!task.collapsed) walkNormal(task.id);
+      });
+    }
+    walkNormal(null);
+  }
+
+  return result;
+}
+
+// ═══════════════════════════════════════════════════
+//  LIST VIEW RENDERER
+// ═══════════════════════════════════════════════════
+function renderListView() {
+  const statusFilter = document.getElementById('status-filter').value;
+  const search = document.getElementById('search-input').value;
+  const rows = getFlattenedDisplay(statusFilter, search);
+  const tbody = document.getElementById('list-body');
+  const empty = document.getElementById('empty-state');
+
+  tbody.innerHTML = '';
+
+  if (!rows.length) {
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  rows.forEach(task => {
+    const depth = getDepth(task);
+    const indent = depth * 20;
+    const hasChildren = tasks.some(t => t.parentId === task.id);
+    const depNames = task.dependsOn.map(d => {
+      const dep = getTask(d);
+      return dep ? `<span class="dep-chip">${escHtml(dep.name)}</span>` : '';
+    }).join('');
+
+    const collapseBtn = hasChildren
+      ? `<button class="collapse-btn" onclick="toggleCollapse('${task.id}')">${task.collapsed ? '&#9654;' : '&#9660;'}</button>`
+      : `<span class="collapse-placeholder"></span>`;
+
+    const tr = document.createElement('tr');
+    tr.dataset.id = task.id;
+    tr.innerHTML = `
+      <td>
+        <div class="task-name-cell" style="padding-left:${indent}px">
+          ${collapseBtn}
+          <span>${escHtml(task.name)}</span>
+        </div>
+      </td>
+      <td>${escHtml(task.assignee)}</td>
+      <td>${task.startDate}</td>
+      <td>${task.endDate}</td>
+      <td><span class="status-badge ${statusBadgeClass(task.status)}">${statusLabel(task.status)}</span></td>
+      <td>${depNames || '<span style="color:#555">—</span>'}</td>
+      <td>
+        <button class="row-action-btn btn-edit"    onclick="openEditModal('${task.id}')">Edit</button>
+        <button class="row-action-btn btn-add-sub" onclick="openAddModal('${task.id}')">+ Sub</button>
+        <button class="row-action-btn btn-del"     onclick="confirmDelete('${task.id}')">Del</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleCollapse(id) {
+  const t = getTask(id);
+  if (t) { t.collapsed = !t.collapsed; saveState(); renderListView(); }
+}
+
+function confirmDelete(id) {
+  const t = getTask(id);
+  if (!t) return;
+  const kids = getAllDescendantIds(id).length;
+  const msg = kids
+    ? `Delete "${t.name}" and its ${kids} subtask(s)?`
+    : `Delete "${t.name}"?`;
+  if (confirm(msg)) { deleteTask(id); }
+}
+
+// ═══════════════════════════════════════════════════
+//  GANTT VIEW RENDERER
+// ═══════════════════════════════════════════════════
+const ROW_HEIGHT = 36;
+const LABEL_WIDTH = 200;
+const BAR_HEIGHT = 20;
+const HEADER_HEIGHT = 48;
+
+function renderGanttView() {
+  const statusFilter = document.getElementById('status-filter').value;
+  const search = document.getElementById('search-input').value;
+  const rows = getFlattenedDisplay(statusFilter, search);
+
+  const { minDate, maxDate } = getProjectDateRange();
+  const totalDays = daysBetween(minDate, maxDate) + 1;
+  const svgWidth  = LABEL_WIDTH + totalDays * pxPerDay;
+  const svgHeight = HEADER_HEIGHT + rows.length * ROW_HEIGHT + 4;
+
+  const svg = document.getElementById('gantt-svg');
+  svg.setAttribute('width',  svgWidth);
+  svg.setAttribute('height', svgHeight);
+  svg.innerHTML = '';
+
+  // defs (arrowhead)
+  defineArrowheadMarker(svg);
+
+  // background
+  const bg = svgEl('rect', { x:0, y:0, width:svgWidth, height:svgHeight, fill:'#1a1a2e' });
+  svg.appendChild(bg);
+
+  // label panel background
+  const labelBg = svgEl('rect', { x:0, y:0, width:LABEL_WIDTH, height:svgHeight, fill:'#16213e' });
+  svg.appendChild(labelBg);
+
+  renderGanttGrid(svg, rows, minDate, totalDays);
+  renderTimeAxis(svg, minDate, totalDays, svgWidth);
+  renderTodayLine(svg, minDate, svgHeight);
+
+  // Build rowIndex map for dependency arrows
+  const rowMap = {};
+  rows.forEach((t, i) => { rowMap[t.id] = i; });
+
+  rows.forEach((task, rowIndex) => {
+    renderGanttBar(svg, task, rowIndex, minDate);
+  });
+
+  // Dependency arrows (after bars so arrows render on top)
+  rows.forEach((task, rowIndex) => {
+    task.dependsOn.forEach(depId => {
+      const depTask = getTask(depId);
+      if (depTask && rowMap[depId] !== undefined) {
+        renderDependencyArrow(svg, depTask, task, rowMap[depId], rowIndex, minDate);
+      }
+    });
+  });
+
+  // Label panel separator line
+  const sep = svgEl('line', { x1: LABEL_WIDTH, y1: 0, x2: LABEL_WIDTH, y2: svgHeight, stroke: '#0f3460', 'stroke-width': 2 });
+  svg.appendChild(sep);
+}
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+  return el;
+}
+
+function svgText(txt, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+  el.textContent = txt;
+  return el;
+}
+
+function dateToX(dateISO, minDate) {
+  return LABEL_WIDTH + daysBetween(minDate, dateISO) * pxPerDay;
+}
+
+function defineArrowheadMarker(svg) {
+  const defs = svgEl('defs', {});
+  const marker = svgEl('marker', {
+    id: 'arrowhead',
+    markerWidth: 6,
+    markerHeight: 6,
+    refX: 5,
+    refY: 3,
+    orient: 'auto'
+  });
+  const poly = svgEl('polygon', { points: '0 0, 6 3, 0 6', fill: '#e94560' });
+  marker.appendChild(poly);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+}
+
+function renderGanttGrid(svg, rows, minDate, totalDays) {
+  // Alternating week column shading
+  let d = new Date(minDate + 'T00:00:00');
+  for (let i = 0; i < totalDays; i++) {
+    const weekNum = Math.floor(i / 7);
+    if (weekNum % 2 === 0) {
+      const shade = svgEl('rect', {
+        x: LABEL_WIDTH + i * pxPerDay,
+        y: HEADER_HEIGHT,
+        width: pxPerDay,
+        height: rows.length * ROW_HEIGHT,
+        fill: '#1e2a40',
+        opacity: 0.5
+      });
+      svg.appendChild(shade);
+    }
+    d.setDate(d.getDate() + 1);
+  }
+
+  // Horizontal row lines
+  for (let r = 0; r <= rows.length; r++) {
+    const y = HEADER_HEIGHT + r * ROW_HEIGHT;
+    const line = svgEl('line', {
+      x1: 0, y1: y,
+      x2: LABEL_WIDTH + totalDays * pxPerDay, y2: y,
+      stroke: '#0f3460',
+      'stroke-width': 1
+    });
+    svg.appendChild(line);
+  }
+}
+
+function renderTimeAxis(svg, minDate, totalDays, svgWidth) {
+  // Header background
+  const hdrBg = svgEl('rect', { x: 0, y: 0, width: svgWidth, height: HEADER_HEIGHT, fill: '#0f3460' });
+  svg.appendChild(hdrBg);
+
+  const start = new Date(minDate + 'T00:00:00');
+  let cur = new Date(start);
+  let lastMonth = -1;
+
+  for (let i = 0; i < totalDays; i++) {
+    const x = LABEL_WIDTH + i * pxPerDay;
+    const month = cur.getMonth();
+    const day   = cur.getDate();
+
+    // Month label
+    if (month !== lastMonth) {
+      const monthName = cur.toLocaleString('default', { month: 'short', year: '2-digit' });
+      svg.appendChild(svgText(monthName, {
+        x: x + 4, y: 16,
+        fill: '#a8dadc', 'font-size': 11, 'font-weight': 'bold',
+        'font-family': 'Segoe UI, sans-serif'
+      }));
+      // Month separator
+      svg.appendChild(svgEl('line', {
+        x1: x, y1: 0, x2: x, y2: HEADER_HEIGHT,
+        stroke: '#a8dadc', 'stroke-width': 1, opacity: 0.5
+      }));
+      lastMonth = month;
+    }
+
+    // Week tick + day number (only if wide enough)
+    if (day === 1 || cur.getDay() === 1) { // Mondays or 1st of month
+      if (pxPerDay >= 14) {
+        svg.appendChild(svgEl('line', {
+          x1: x, y1: 28, x2: x, y2: HEADER_HEIGHT,
+          stroke: '#a8dadc', 'stroke-width': 1, opacity: 0.25
+        }));
+      }
+    }
+    if (pxPerDay >= 20) {
+      // Show day number
+      svg.appendChild(svgText(day, {
+        x: x + pxPerDay / 2, y: 38,
+        fill: '#888', 'font-size': 9, 'text-anchor': 'middle',
+        'font-family': 'Segoe UI, sans-serif'
+      }));
+    }
+
+    cur.setDate(cur.getDate() + 1);
+  }
+}
+
+function renderTodayLine(svg, minDate, svgHeight) {
+  const today = todayISO();
+  if (today < minDate) return;
+  const x = dateToX(today, minDate);
+  const line = svgEl('line', {
+    x1: x, y1: HEADER_HEIGHT,
+    x2: x, y2: svgHeight,
+    stroke: '#e94560',
+    'stroke-width': 2,
+    'stroke-dasharray': '5,4',
+    opacity: 0.85
+  });
+  svg.appendChild(line);
+  // "Today" label
+  svg.appendChild(svgText('Today', {
+    x: x + 3, y: HEADER_HEIGHT - 4,
+    fill: '#e94560', 'font-size': 9,
+    'font-family': 'Segoe UI, sans-serif'
+  }));
+}
+
+function renderGanttBar(svg, task, rowIndex, minDate) {
+  const depth = getDepth(task);
+  const indentPx = depth * 12;
+  const y = HEADER_HEIGHT + rowIndex * ROW_HEIGHT;
+  const barY = y + (ROW_HEIGHT - BAR_HEIGHT) / 2;
+
+  // Label text (left panel)
+  const maxLabelW = LABEL_WIDTH - indentPx - 8;
+  const labelText = truncateText(task.name, maxLabelW, 11);
+  svg.appendChild(svgText(labelText, {
+    x: 6 + indentPx, y: y + ROW_HEIGHT / 2 + 4,
+    fill: '#eee', 'font-size': 11,
+    'font-family': 'Segoe UI, sans-serif',
+    'clip-path': `inset(0 ${8}px 0 0)`
+  }));
+
+  // Gantt bar
+  if (!task.startDate || !task.endDate) return;
+  const barX = dateToX(task.startDate, minDate);
+  const barW = Math.max(pxPerDay * 0.5, daysBetween(task.startDate, task.endDate) * pxPerDay);
+  const color = barColor(task.status);
+
+  const rect = svgEl('rect', {
+    x: barX, y: barY,
+    width: barW, height: BAR_HEIGHT,
+    fill: color, rx: 4, ry: 4,
+    style: 'cursor:pointer'
+  });
+  rect.addEventListener('click', () => openEditModal(task.id));
+  svg.appendChild(rect);
+
+  // Duration label inside bar (if wide enough)
+  const dur = daysBetween(task.startDate, task.endDate);
+  if (barW > 40) {
+    const labelFill = task.status === 'in-progress' ? '#16213e' : '#eee';
+    svg.appendChild(svgText(dur + 'd', {
+      x: barX + barW / 2, y: barY + BAR_HEIGHT / 2 + 4,
+      fill: labelFill, 'font-size': 9, 'text-anchor': 'middle',
+      'font-family': 'Segoe UI, sans-serif'
+    }));
+  }
+}
+
+function truncateText(str, maxPx, fontSize) {
+  // Rough approximation: ~0.6 * fontSize per char
+  const charsMax = Math.floor(maxPx / (fontSize * 0.6));
+  if (str.length <= charsMax) return str;
+  return str.slice(0, Math.max(1, charsMax - 1)) + '…';
+}
+
+function renderDependencyArrow(svg, fromTask, toTask, fromRow, toRow, minDate) {
+  if (!fromTask.endDate || !toTask.startDate) return;
+
+  const fromX = dateToX(fromTask.endDate, minDate) + pxPerDay * daysBetween(fromTask.startDate, fromTask.endDate) * 0;
+  // Arrow starts from end of fromTask bar
+  const startX = dateToX(fromTask.endDate, minDate);
+  const startY = HEADER_HEIGHT + fromRow * ROW_HEIGHT + ROW_HEIGHT / 2;
+  const endX   = dateToX(toTask.startDate, minDate);
+  const endY   = HEADER_HEIGHT + toRow * ROW_HEIGHT + ROW_HEIGHT / 2;
+
+  // Orthogonal path: right → down/up → right
+  const midX = startX + Math.max(12, (endX - startX) / 2);
+  const d = `M ${startX} ${startY} H ${midX} V ${endY} H ${endX - 6}`;
+
+  const path = svgEl('path', {
+    d,
+    fill: 'none',
+    stroke: '#e94560',
+    'stroke-width': 1.5,
+    opacity: 0.75,
+    'marker-end': 'url(#arrowhead)'
+  });
+  svg.appendChild(path);
+}
+
+// ═══════════════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════════════
+function openAddModal(parentId) {
+  modalMode = 'add';
+  modalParentId = parentId || null;
+  modalEditId = null;
+
+  document.getElementById('modal-title').textContent = parentId ? 'Add Subtask' : 'Add Task';
+  document.getElementById('field-name').value = '';
+  document.getElementById('field-assignee').value = '';
+  document.getElementById('field-start').value = todayISO();
+  document.getElementById('field-end').value = addDays(todayISO(), 7);
+  document.getElementById('field-status').value = 'todo';
+  document.getElementById('btn-delete-modal').style.display = 'none';
+  clearFormError();
+  populateDependsDropdown(null, []);
+  showModal();
+}
+
+function openEditModal(id) {
+  const task = getTask(id);
+  if (!task) return;
+  modalMode = 'edit';
+  modalEditId = id;
+  modalParentId = task.parentId;
+
+  document.getElementById('modal-title').textContent = 'Edit Task';
+  document.getElementById('field-name').value = task.name;
+  document.getElementById('field-assignee').value = task.assignee;
+  document.getElementById('field-start').value = task.startDate;
+  document.getElementById('field-end').value = task.endDate;
+  document.getElementById('field-status').value = task.status;
+  document.getElementById('btn-delete-modal').style.display = 'inline-block';
+  clearFormError();
+  populateDependsDropdown(id, task.dependsOn);
+  showModal();
+}
+
+function populateDependsDropdown(excludeId, selected) {
+  const sel = document.getElementById('dep-select');
+  sel.innerHTML = '';
+
+  // Get all descendants of excludeId to exclude (can't depend on own children)
+  const excludeIds = new Set(excludeId ? [excludeId, ...getAllDescendantIds(excludeId)] : []);
+
+  tasks.filter(t => !excludeIds.has(t.id)).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = ('—'.repeat(getDepth(t)) + ' ' + t.name).trim();
+    opt.selected = selected && selected.includes(t.id);
+    sel.appendChild(opt);
+  });
+}
+
+function showModal() {
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('field-name').focus();
+}
+
+function hideModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+function clearFormError() {
+  const el = document.getElementById('form-error');
+  el.style.display = 'none';
+  el.textContent = '';
+}
+
+function showFormError(msg) {
+  const el = document.getElementById('form-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function saveModal() {
+  const name  = document.getElementById('field-name').value.trim();
+  const start = document.getElementById('field-start').value;
+  const end   = document.getElementById('field-end').value;
+  const assignee = document.getElementById('field-assignee').value.trim();
+  const status   = document.getElementById('field-status').value;
+
+  const selEl = document.getElementById('dep-select');
+  const dependsOn = Array.from(selEl.selectedOptions).map(o => o.value);
+
+  // Validation
+  if (!name) { showFormError('Task name is required.'); return; }
+  if (!start) { showFormError('Start date is required.'); return; }
+  if (!end)   { showFormError('End date is required.'); return; }
+  if (end < start) { showFormError('End date must be on or after start date.'); return; }
+
+  // Circular dependency check (only for edit)
+  if (modalMode === 'edit' && modalEditId) {
+    for (const depId of dependsOn) {
+      if (wouldCreateCycle(modalEditId, depId)) {
+        showFormError('Circular dependency detected. Cannot depend on a task that already depends on this task.');
+        return;
+      }
+    }
+  }
+
+  const data = { name, assignee, startDate: start, endDate: end, status, dependsOn, parentId: modalParentId };
+
+  if (modalMode === 'add') {
+    addTask(data);
+  } else {
+    updateTask(modalEditId, data);
+  }
+
+  hideModal();
+}
+
+function wouldCreateCycle(taskId, newDepId) {
+  // Would adding newDepId as a dependency of taskId create a cycle?
+  // A cycle exists if taskId is reachable from newDepId
+  const visited = new Set();
+  const stack = [newDepId];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (cur === taskId) return true;
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    const t = getTask(cur);
+    if (t) t.dependsOn.forEach(d => stack.push(d));
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════════
+//  EXCEL EXPORT
+// ═══════════════════════════════════════════════════
+function exportToExcel() {
+  if (typeof XLSX === 'undefined') {
+    alert('SheetJS library not loaded. Please check your internet connection.');
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Sheet 1: Tasks (flat with all fields) ──
+  const headers = ['ID','Name','Parent Task','Assignee','Start Date','End Date','Status','Depends On','Duration (days)'];
+  const rows1 = tasks.map(t => {
+    const parent = t.parentId ? getTask(t.parentId) : null;
+    const deps = t.dependsOn.map(d => { const dt = getTask(d); return dt ? dt.name : d; }).join('; ');
+    return [
+      t.id,
+      t.name,
+      parent ? parent.name : '',
+      t.assignee,
+      t.startDate,
+      t.endDate,
+      statusLabel(t.status),
+      deps,
+      daysBetween(t.startDate, t.endDate)
+    ];
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet([headers, ...rows1]);
+  // column widths
+  ws1['!cols'] = [
+    {wch:18},{wch:30},{wch:20},{wch:15},{wch:12},{wch:12},{wch:14},{wch:30},{wch:14}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Tasks');
+
+  // ── Sheet 2: Gantt Summary (indented, human-readable) ──
+  const headers2 = ['Task Name','Assignee','Start Date','End Date','Status','Duration (days)'];
+  const flatRows = getFlattenedDisplay('', '');
+  const rows2 = flatRows.map(t => {
+    const depth = getDepth(t);
+    const indent = '  '.repeat(depth);
+    return [
+      indent + t.name,
+      t.assignee,
+      t.startDate,
+      t.endDate,
+      statusLabel(t.status),
+      daysBetween(t.startDate, t.endDate)
+    ];
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet([headers2, ...rows2]);
+  ws2['!cols'] = [{wch:35},{wch:15},{wch:12},{wch:12},{wch:14},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Gantt Summary');
+
+  XLSX.writeFile(wb, 'project-manager.xlsx');
+}
+
+// ═══════════════════════════════════════════════════
+//  VIEW SWITCHING & RENDER
+// ═══════════════════════════════════════════════════
+function setView(v) {
+  currentView = v;
+  const listDiv  = document.getElementById('list-view');
+  const ganttDiv = document.getElementById('gantt-view');
+  const zoomDiv  = document.getElementById('gantt-zoom');
+  const btnList  = document.getElementById('btn-list-view');
+  const btnGantt = document.getElementById('btn-gantt-view');
+
+  if (v === 'list') {
+    listDiv.style.display  = 'block';
+    ganttDiv.style.display = 'none';
+    zoomDiv.style.display  = 'none';
+    btnList.classList.add('active');
+    btnGantt.classList.remove('active');
+  } else {
+    listDiv.style.display  = 'none';
+    ganttDiv.style.display = 'block';
+    zoomDiv.style.display  = 'flex';
+    btnList.classList.remove('active');
+    btnGantt.classList.add('active');
+  }
+  render();
+}
+
+function render() {
+  if (currentView === 'list') {
+    renderListView();
+  } else {
+    renderGanttView();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  EVENT LISTENERS
+// ═══════════════════════════════════════════════════
+document.getElementById('btn-list-view').addEventListener('click', () => setView('list'));
+document.getElementById('btn-gantt-view').addEventListener('click', () => setView('gantt'));
+document.getElementById('btn-add-task').addEventListener('click', () => openAddModal(null));
+document.getElementById('btn-export').addEventListener('click', exportToExcel);
+document.getElementById('btn-save-modal').addEventListener('click', saveModal);
+document.getElementById('btn-cancel-modal').addEventListener('click', hideModal);
+
+document.getElementById('btn-delete-modal').addEventListener('click', () => {
+  if (!modalEditId) return;
+  const t = getTask(modalEditId);
+  if (!t) return;
+  const kids = getAllDescendantIds(modalEditId).length;
+  const msg = kids
+    ? `Delete "${t.name}" and its ${kids} subtask(s)?`
+    : `Delete "${t.name}"?`;
+  if (confirm(msg)) {
+    hideModal();
+    deleteTask(modalEditId);
+  }
+});
+
+document.getElementById('status-filter').addEventListener('change', render);
+document.getElementById('search-input').addEventListener('input', render);
+
+// Zoom buttons
+document.getElementById('btn-zoom-in').addEventListener('click', () => {
+  pxPerDay = Math.min(60, pxPerDay + 4);
+  document.getElementById('zoom-label').textContent = pxPerDay + 'px/day';
+  if (currentView === 'gantt') renderGanttView();
+});
+document.getElementById('btn-zoom-out').addEventListener('click', () => {
+  pxPerDay = Math.max(8, pxPerDay - 4);
+  document.getElementById('zoom-label').textContent = pxPerDay + 'px/day';
+  if (currentView === 'gantt') renderGanttView();
+});
+
+// Escape key closes modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') hideModal();
+});
+
+// Click outside modal to close
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) hideModal();
+});
+
+// Enter key in modal submits
+document.getElementById('modal').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.tagName !== 'SELECT') saveModal();
+});
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+loadState();
+render();
+</script>
+</body>
+</html>

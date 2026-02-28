@@ -14,6 +14,23 @@ Every app follows the same pattern:
 - **CDN libraries only** — loaded via `<script src="...">` in `<head>` (e.g. SheetJS)
 - **No server required** — open the file directly with `open filename.html`
 
+## Git Workflow
+
+After completing any code change — bug fix, new feature, or edit to any file — always commit and push without waiting to be asked:
+
+```bash
+git add <changed-files>
+git commit -m "concise description of what changed and why"
+git push
+```
+
+Commit message conventions:
+- `add` — new file or feature (`add dark mode toggle to project-manager`)
+- `fix` — bug fix (`fix Gantt bar width calculation for same-day tasks`)
+- `update` — change to existing feature (`update status badge colors`)
+- Keep messages under 72 characters; no period at the end
+- Stage specific files by name, never `git add -A` or `git add .`
+
 ## Running Apps
 
 ```bash

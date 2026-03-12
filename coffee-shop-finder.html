@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coffee Shop Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      color: #eee;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background: #16213e;
+      border-bottom: 2px solid #0f3460;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.3rem;
+      color: #e94560;
+      letter-spacing: 0.5px;
+    }
+
+    header .subtitle {
+      font-size: 0.8rem;
+      color: #a8dadc;
+      margin-top: 2px;
+    }
+
+    .header-left { flex: 1; }
+
+    #locate-btn {
+      background: #e94560;
+      color: #fff;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+    #locate-btn:hover { opacity: 0.85; }
+    #locate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #refresh-btn {
+      background: #0f3460;
+      color: #a8dadc;
+      border: 2px solid #a8dadc;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+      display: none;
+    }
+    #refresh-btn:hover { opacity: 0.8; }
+
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 340px;
+      flex-shrink: 0;
+      background: #16213e;
+      border-right: 2px solid #0f3460;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 12px 16px;
+      background: #0f3460;
+      font-size: 0.8rem;
+      color: #a8dadc;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .count-badge {
+      background: #e94560;
+      color: #fff;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+    }
+
+    .sort-row {
+      padding: 8px 12px;
+      border-bottom: 1px solid #0f3460;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .sort-row label {
+      font-size: 0.75rem;
+      color: #aaa;
+    }
+
+    .sort-row select {
+      background: #1a1a2e;
+      color: #eee;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-size: 0.78rem;
+      flex: 1;
+    }
+
+    .results-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .results-list::-webkit-scrollbar { width: 6px; }
+    .results-list::-webkit-scrollbar-track { background: #0f3460; }
+    .results-list::-webkit-scrollbar-thumb { background: #e94560; border-radius: 3px; }
+
+    .coffee-card {
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .coffee-card:hover { border-color: #a8dadc; background: #16213e; }
+    .coffee-card.active { border-color: #e94560; background: #16213e; }
+
+    .card-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #eee;
+      margin-bottom: 4px;
+    }
+
+    .card-dist {
+      font-size: 0.78rem;
+      color: #e94560;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .tag {
+      background: #0f3460;
+      color: #a8dadc;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.7rem;
+    }
+
+    .tag.open { background: #1a4a2e; color: #5dde8a; }
+    .tag.closed { background: #4a1a1a; color: #e94560; }
+    .tag.rating { background: #3a2e0f; color: #f0c060; }
+
+    .card-address {
+      font-size: 0.74rem;
+      color: #aaa;
+      margin-top: 5px;
+    }
+
+    /* States */
+    .state-msg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex: 1;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .state-msg .icon { font-size: 2.5rem; }
+    .state-msg .title { color: #a8dadc; font-size: 1rem; font-weight: 600; }
+    .state-msg .desc { color: #aaa; font-size: 0.82rem; line-height: 1.5; }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #0f3460;
+      border-top-color: #e94560;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Map */
+    #map {
+      flex: 1;
+      z-index: 0;
+    }
+
+    /* Custom map popup */
+    .leaflet-popup-content-wrapper {
+      background: #16213e;
+      color: #eee;
+      border: 1px solid #e94560;
+      border-radius: 8px;
+    }
+    .leaflet-popup-tip { background: #16213e; }
+    .leaflet-popup-content { margin: 10px 14px; }
+    .popup-name { font-weight: 700; color: #e94560; margin-bottom: 4px; }
+    .popup-dist { font-size: 0.8rem; color: #a8dadc; }
+    .popup-info { font-size: 0.78rem; color: #ccc; margin-top: 4px; }
+
+    /* Error banner */
+    #error-banner {
+      background: #4a1a1a;
+      color: #e94560;
+      border-bottom: 2px solid #e94560;
+      padding: 8px 16px;
+      font-size: 0.82rem;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 640px) {
+      .main { flex-direction: column; }
+      .sidebar { width: 100%; height: 50%; border-right: none; border-bottom: 2px solid #0f3460; }
+      #map { flex: 1; min-height: 200px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>☕ Coffee Shop Finder</h1>
+    <div class="subtitle">Best coffee within 2 miles of you</div>
+  </div>
+  <button id="refresh-btn" onclick="fetchCoffeeShops()">↺ Refresh</button>
+  <button id="locate-btn" onclick="startSearch()">Find Coffee Near Me</button>
+</header>
+
+<div id="error-banner"></div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span>NEARBY COFFEE SHOPS</span>
+      <span class="count-badge" id="count-badge">0</span>
+    </div>
+    <div class="sort-row">
+      <label>Sort by:</label>
+      <select id="sort-select" onchange="renderList()">
+        <option value="distance">Distance</option>
+        <option value="name">Name (A–Z)</option>
+        <option value="rating">Rating</option>
+      </select>
+    </div>
+    <div class="results-list" id="results-list">
+      <div class="state-msg">
+        <div class="icon">📍</div>
+        <div class="title">Find Coffee Near You</div>
+        <div class="desc">Click the button above to detect your location and find the best coffee shops within 2 miles.</div>
+      </div>
+    </div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script>
+  const RADIUS_METERS = 3219; // 2 miles
+  let map, userMarker, userCircle;
+  let shopMarkers = [];
+  let shops = [];
+  let activeCard = null;
+  let userLatLng = null;
+
+  // Init map
+  map = L.map('map', { zoomControl: true }).setView([37.7749, -122.4194], 13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 19
+  }).addTo(map);
+
+  const coffeeIcon = L.divIcon({
+    html: '<div style="font-size:22px;line-height:1;">☕</div>',
+    className: '',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16]
+  });
+
+  const activeIcon = L.divIcon({
+    html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 0 6px #e94560);">☕</div>',
+    className: '',
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -18]
+  });
+
+  const userIcon = L.divIcon({
+    html: '<div style="width:14px;height:14px;background:#e94560;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px #e94560;"></div>',
+    className: '',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7]
+  });
+
+  function showError(msg) {
+    const banner = document.getElementById('error-banner');
+    banner.textContent = '⚠ ' + msg;
+    banner.style.display = 'flex';
+    setTimeout(() => { banner.style.display = 'none'; }, 6000);
+  }
+
+  function startSearch() {
+    const btn = document.getElementById('locate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Locating…';
+    document.getElementById('error-banner').style.display = 'none';
+
+    if (!navigator.geolocation) {
+      showError('Geolocation is not supported by your browser.');
+      btn.disabled = false;
+      btn.textContent = 'Find Coffee Near Me';
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        userLatLng = [pos.coords.latitude, pos.coords.longitude];
+        btn.textContent = 'Updating…';
+        fetchCoffeeShops();
+      },
+      err => {
+        btn.disabled = false;
+        btn.textContent = 'Find Coffee Near Me';
+        const msgs = {
+          1: 'Location access denied. Please allow location access and try again.',
+          2: 'Could not determine your location. Try again.',
+          3: 'Location request timed out. Try again.'
+        };
+        showError(msgs[err.code] || 'Location error.');
+      },
+      { timeout: 10000, maximumAge: 60000 }
+    );
+  }
+
+  async function fetchCoffeeShops() {
+    const btn = document.getElementById('locate-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+    btn.disabled = true;
+    refreshBtn.style.display = 'none';
+
+    showLoading();
+
+    // Place user pin
+    if (userMarker) map.removeLayer(userMarker);
+    if (userCircle) map.removeLayer(userCircle);
+    userMarker = L.marker(userLatLng, { icon: userIcon, zIndexOffset: 1000 })
+      .addTo(map)
+      .bindTooltip('You are here', { permanent: false });
+    userCircle = L.circle(userLatLng, {
+      radius: RADIUS_METERS,
+      color: '#a8dadc',
+      weight: 1.5,
+      opacity: 0.5,
+      fillColor: '#a8dadc',
+      fillOpacity: 0.04
+    }).addTo(map);
+
+    map.fitBounds(userCircle.getBounds(), { padding: [20, 20] });
+
+    const [lat, lon] = userLatLng;
+    const overpassQuery = `
+      [out:json][timeout:25];
+      (
+        node["amenity"="cafe"](around:${RADIUS_METERS},${lat},${lon});
+        node["amenity"="coffee_shop"](around:${RADIUS_METERS},${lat},${lon});
+        node["shop"="coffee"](around:${RADIUS_METERS},${lat},${lon});
+        node["cuisine"="coffee_shop"](around:${RADIUS_METERS},${lat},${lon});
+        way["amenity"="cafe"](around:${RADIUS_METERS},${lat},${lon});
+      );
+      out body center;
+    `;
+
+    try {
+      const resp = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        body: 'data=' + encodeURIComponent(overpassQuery)
+      });
+
+      if (!resp.ok) throw new Error('Overpass API error: ' + resp.status);
+      const data = await resp.json();
+
+      // Parse elements
+      const raw = data.elements.map(el => {
+        const tags = el.tags || {};
+        const elLat = el.lat ?? el.center?.lat;
+        const elLon = el.lon ?? el.center?.lon;
+        if (!elLat || !elLon) return null;
+
+        const name = tags.name || tags['name:en'] || 'Unnamed Cafe';
+        const dist = haversine(lat, lon, elLat, elLon);
+        const rating = tags['stars'] ? parseFloat(tags['stars']) : null;
+        const hours = tags['opening_hours'] || null;
+        const phone = tags['phone'] || tags['contact:phone'] || null;
+        const website = tags['website'] || tags['contact:website'] || null;
+        const cuisine = tags['cuisine'] || null;
+        const wifi = tags['internet_access'] === 'wlan' || tags['wifi'] === 'yes';
+        const outdoor = tags['outdoor_seating'] === 'yes';
+        const takeaway = tags['takeaway'] === 'yes' || tags['takeaway'] === 'only';
+        const brand = tags['brand'] || null;
+
+        // Build address
+        const street = [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' ');
+        const city = tags['addr:city'] || '';
+        const address = [street, city].filter(Boolean).join(', ') || null;
+
+        return { id: el.id, name, lat: elLat, lon: elLon, dist, rating, hours, phone, website, cuisine, wifi, outdoor, takeaway, brand, address };
+      }).filter(Boolean);
+
+      // Dedupe by id
+      const seen = new Set();
+      shops = raw.filter(s => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
+
+      clearMarkers();
+      if (shops.length === 0) {
+        showEmpty();
+      } else {
+        renderList();
+        addMarkers();
+      }
+
+      btn.textContent = 'Update Location';
+      btn.disabled = false;
+      refreshBtn.style.display = 'inline-block';
+
+    } catch (e) {
+      showError('Could not fetch coffee shops. Check your connection and try again.');
+      showIdle();
+      btn.disabled = false;
+      btn.textContent = 'Find Coffee Near Me';
+    }
+  }
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 3958.8; // miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.asin(Math.sqrt(a));
+  }
+
+  function formatDist(d) {
+    if (d < 0.1) return Math.round(d * 5280) + ' ft';
+    return d.toFixed(2) + ' mi';
+  }
+
+  function isOpenNow(hours) {
+    if (!hours) return null;
+    // Basic 24/7 check
+    if (hours === '24/7') return true;
+    // We can't fully parse OSM opening_hours without a library, so just surface the raw string
+    return null;
+  }
+
+  function renderList() {
+    const sort = document.getElementById('sort-select').value;
+    const sorted = [...shops].sort((a, b) => {
+      if (sort === 'distance') return a.dist - b.dist;
+      if (sort === 'name') return a.name.localeCompare(b.name);
+      if (sort === 'rating') return (b.rating || 0) - (a.rating || 0);
+      return 0;
+    });
+
+    document.getElementById('count-badge').textContent = shops.length;
+
+    const list = document.getElementById('results-list');
+    list.innerHTML = '';
+
+    sorted.forEach((shop, idx) => {
+      const card = document.createElement('div');
+      card.className = 'coffee-card';
+      card.dataset.id = shop.id;
+
+      const open = isOpenNow(shop.hours);
+      const tags = [];
+      if (open === true) tags.push(`<span class="tag open">Open Now</span>`);
+      if (shop.hours === '24/7') tags.push(`<span class="tag open">24/7</span>`);
+      if (shop.rating) tags.push(`<span class="tag rating">★ ${shop.rating}</span>`);
+      if (shop.wifi) tags.push(`<span class="tag">WiFi</span>`);
+      if (shop.outdoor) tags.push(`<span class="tag">Outdoor</span>`);
+      if (shop.takeaway) tags.push(`<span class="tag">Takeaway</span>`);
+      if (shop.brand) tags.push(`<span class="tag">${escHtml(shop.brand)}</span>`);
+
+      card.innerHTML = `
+        <div class="card-name">${escHtml(shop.name)}</div>
+        <div class="card-dist">${formatDist(shop.dist)} away</div>
+        ${tags.length ? `<div class="card-tags">${tags.join('')}</div>` : ''}
+        ${shop.address ? `<div class="card-address">📍 ${escHtml(shop.address)}</div>` : ''}
+        ${shop.hours && shop.hours !== '24/7' ? `<div class="card-address" style="margin-top:3px;">🕐 ${escHtml(shop.hours.split(';')[0])}</div>` : ''}
+      `;
+
+      card.addEventListener('click', () => selectShop(shop, card));
+      list.appendChild(card);
+    });
+  }
+
+  function selectShop(shop, card) {
+    // Deactivate previous
+    if (activeCard) activeCard.classList.remove('active');
+    activeCard = card;
+    card.classList.add('active');
+
+    // Reset all marker icons
+    shopMarkers.forEach(({ marker }) => marker.setIcon(coffeeIcon));
+
+    // Highlight this marker
+    const entry = shopMarkers.find(m => m.id === shop.id);
+    if (entry) {
+      entry.marker.setIcon(activeIcon);
+      entry.marker.openPopup();
+      map.panTo([shop.lat, shop.lon], { animate: true });
+    }
+  }
+
+  function addMarkers() {
+    shops.forEach(shop => {
+      const marker = L.marker([shop.lat, shop.lon], { icon: coffeeIcon }).addTo(map);
+
+      const open = isOpenNow(shop.hours);
+      const openStr = shop.hours === '24/7' ? '24/7' : (open === true ? 'Open' : (open === false ? 'Closed' : ''));
+
+      marker.bindPopup(`
+        <div class="popup-name">${escHtml(shop.name)}</div>
+        <div class="popup-dist">${formatDist(shop.dist)} away</div>
+        ${openStr ? `<div class="popup-info">${openStr === '24/7' || openStr === 'Open' ? '🟢' : '🔴'} ${openStr}</div>` : ''}
+        ${shop.address ? `<div class="popup-info">📍 ${escHtml(shop.address)}</div>` : ''}
+        ${shop.website ? `<div class="popup-info"><a href="${escHtml(shop.website)}" target="_blank" style="color:#a8dadc;">🌐 Website</a></div>` : ''}
+        ${shop.phone ? `<div class="popup-info">📞 ${escHtml(shop.phone)}</div>` : ''}
+      `);
+
+      marker.on('click', () => {
+        // Sync sidebar
+        const cardEl = document.querySelector(`.coffee-card[data-id="${shop.id}"]`);
+        if (cardEl) {
+          if (activeCard) activeCard.classList.remove('active');
+          activeCard = cardEl;
+          cardEl.classList.add('active');
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          shopMarkers.forEach(({ marker: m }) => m.setIcon(coffeeIcon));
+          marker.setIcon(activeIcon);
+        }
+      });
+
+      shopMarkers.push({ id: shop.id, marker });
+    });
+  }
+
+  function clearMarkers() {
+    shopMarkers.forEach(({ marker }) => map.removeLayer(marker));
+    shopMarkers = [];
+    activeCard = null;
+  }
+
+  function showLoading() {
+    document.getElementById('count-badge').textContent = '…';
+    document.getElementById('results-list').innerHTML = `
+      <div class="state-msg">
+        <div class="spinner"></div>
+        <div class="title">Searching nearby…</div>
+        <div class="desc">Finding coffee shops within 2 miles of your location.</div>
+      </div>
+    `;
+  }
+
+  function showEmpty() {
+    document.getElementById('count-badge').textContent = '0';
+    document.getElementById('results-list').innerHTML = `
+      <div class="state-msg">
+        <div class="icon">😔</div>
+        <div class="title">No Coffee Shops Found</div>
+        <div class="desc">No cafes were found within 2 miles. Try refreshing or check your location.</div>
+      </div>
+    `;
+  }
+
+  function showIdle() {
+    document.getElementById('count-badge').textContent = '0';
+    document.getElementById('results-list').innerHTML = `
+      <div class="state-msg">
+        <div class="icon">📍</div>
+        <div class="title">Ready to Search</div>
+        <div class="desc">Click "Find Coffee Near Me" to get started.</div>
+      </div>
+    `;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

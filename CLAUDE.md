@@ -66,9 +66,11 @@ Interactive button pattern (view toggles):
 ```
 Status values: `"todo"` | `"in-progress"` | `"done"` | `"blocked"`
 
-**Key globals:** `tasks[]`, `currentView` (`'list'`|`'gantt'`), `pxPerDay` (Gantt zoom)
+**Key globals:** `tasks[]`, `currentView` (`'list'`|`'cards'`|`'gantt'`), `pxPerDay` (Gantt zoom)
 
-**Render flow:** user action → mutate `tasks[]` → `saveState()` → `render()` → `renderListView()` or `renderGanttView()`
+**Render flow:** user action → mutate `tasks[]` → `saveState()` → `render()` → `renderListView()`, `renderCardsView()`, or `renderGanttView()`
+
+**Cards view** is a kanban board: one column per status (`STATUSES` array), HTML5 drag-and-drop moves a card between columns and updates `task.status`. Cards are flat (no hierarchy); each card shows a parent breadcrumb and subtask progress instead.
 
 **Gantt** is pure SVG built with `document.createElementNS`. Constants: `ROW_HEIGHT=36`, `LABEL_WIDTH=200`, `BAR_HEIGHT=20`, `HEADER_HEIGHT=48`. X-position of any date: `LABEL_WIDTH + daysBetween(minDate, dateISO) * pxPerDay`.
 

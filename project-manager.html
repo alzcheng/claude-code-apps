@@ -242,6 +242,157 @@
     .btn-add-sub { background: #1a1a2e; border-color: #888;    color: #aaa; }
     .btn-del     { background: #3a0a15; border-color: #e94560; color: #e94560; }
 
+    /* ── Cards View ── */
+    #cards-view { display: none; padding: 1rem 1.5rem; }
+
+    #board {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .board-col {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 12px;
+      width: 280px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 170px);
+      transition: border-color 0.15s;
+    }
+
+    .board-col.drag-over { border-color: #a8dadc; }
+
+    .board-col-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.65rem 0.8rem;
+      border-bottom: 2px solid;
+    }
+
+    .board-col-header h3 {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .col-count {
+      background: #1a1a2e;
+      color: #aaa;
+      font-size: 0.72rem;
+      padding: 1px 8px;
+      border-radius: 10px;
+    }
+
+    .col-add-btn {
+      margin-left: auto;
+      width: 22px; height: 22px;
+      background: none;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      color: #a8dadc;
+      font-size: 0.9rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .col-add-btn:hover { border-color: #a8dadc; background: #0f3460; }
+
+    .board-cards {
+      padding: 0.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      overflow-y: auto;
+      min-height: 70px;
+      flex: 1;
+    }
+
+    .board-empty-hint {
+      color: #555;
+      font-size: 0.78rem;
+      text-align: center;
+      padding: 0.8rem 0;
+      border: 1px dashed #0f3460;
+      border-radius: 8px;
+    }
+
+    .task-card {
+      background: #1a1a2e;
+      border: 1px solid #0f3460;
+      border-left: 4px solid #0f3460;
+      border-radius: 8px;
+      padding: 0.6rem 0.7rem;
+      cursor: grab;
+      transition: border-color 0.15s, opacity 0.15s;
+    }
+
+    .task-card:hover { border-color: #a8dadc; }
+    .task-card.dragging { opacity: 0.4; }
+
+    .card-todo        { border-left-color: #0f3460; }
+    .card-in-progress { border-left-color: #a8dadc; }
+    .card-done        { border-left-color: #2d6a4f; }
+    .card-blocked     { border-left-color: #e94560; }
+
+    .card-parent {
+      font-size: 0.7rem;
+      color: #888;
+      margin-bottom: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #eee;
+      margin-bottom: 6px;
+      word-break: break-word;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 0.74rem;
+      color: #aaa;
+    }
+
+    .card-avatar {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: #0f3460;
+      color: #a8dadc;
+      font-size: 0.62rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .card-dates { white-space: nowrap; }
+    .card-dates.overdue { color: #e94560; font-weight: 600; }
+
+    .card-chip {
+      background: #0f3460;
+      color: #a8dadc;
+      font-size: 0.68rem;
+      padding: 1px 7px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+
     /* ── Gantt View ── */
     #gantt-view { display: none; }
 
@@ -406,6 +557,7 @@
 <div id="header">
   <h1>PROJECT MANAGER</h1>
   <button class="view-btn active" id="btn-list-view">&#9776; List View</button>
+  <button class="view-btn" id="btn-cards-view">&#9642;&#9642; Cards</button>
   <button class="view-btn" id="btn-gantt-view">&#9632; Gantt View</button>
   <button id="btn-export">&#11015; Export Excel</button>
 </div>
@@ -450,6 +602,11 @@
     <div id="empty-state" style="display:none">
       <p>No tasks yet. Click <strong>+ Add Task</strong> to get started.</p>
     </div>
+  </div>
+
+  <!-- Cards View -->
+  <div id="cards-view">
+    <div id="board"></div>
   </div>
 
   <!-- Gantt View -->
@@ -823,6 +980,121 @@ function confirmDelete(id) {
     ? `Delete "${t.name}" and its ${kids} subtask(s)?`
     : `Delete "${t.name}"?`;
   if (confirm(msg)) { deleteTask(id); }
+}
+
+// ═══════════════════════════════════════════════════
+//  CARDS VIEW RENDERER (kanban board by status)
+// ═══════════════════════════════════════════════════
+const STATUSES = ['todo', 'in-progress', 'done', 'blocked'];
+
+function initials(name) {
+  return name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+}
+
+function fmtShortDate(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('default', { month: 'short', day: 'numeric' });
+}
+
+function renderCardsView() {
+  const statusFilter = document.getElementById('status-filter').value;
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  STATUSES.forEach(status => {
+    if (statusFilter && statusFilter !== status) return;
+
+    const colTasks = tasks
+      .filter(t => t.status === status && (!q || t.name.toLowerCase().includes(q)))
+      .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
+
+    const col = document.createElement('div');
+    col.className = 'board-col';
+    col.dataset.status = status;
+
+    const header = document.createElement('div');
+    header.className = 'board-col-header';
+    header.style.borderBottomColor = barColor(status);
+    const headerColor = { todo: '#a8dadc', 'in-progress': '#a8dadc', done: '#74c69d', blocked: '#e94560' }[status];
+    header.innerHTML = `
+      <h3 style="color:${headerColor}">${statusLabel(status)}</h3>
+      <span class="col-count">${colTasks.length}</span>
+    `;
+    const addBtn = document.createElement('button');
+    addBtn.className = 'col-add-btn';
+    addBtn.textContent = '+';
+    addBtn.title = 'Add task in ' + statusLabel(status);
+    addBtn.addEventListener('click', () => {
+      openAddModal(null);
+      document.getElementById('field-status').value = status;
+    });
+    header.appendChild(addBtn);
+    col.appendChild(header);
+
+    const cardsWrap = document.createElement('div');
+    cardsWrap.className = 'board-cards';
+
+    if (!colTasks.length) {
+      cardsWrap.innerHTML = '<div class="board-empty-hint">Drop tasks here</div>';
+    }
+
+    colTasks.forEach(task => cardsWrap.appendChild(buildTaskCard(task)));
+    col.appendChild(cardsWrap);
+
+    // Drag & drop targets
+    col.addEventListener('dragover', e => {
+      e.preventDefault();
+      col.classList.add('drag-over');
+    });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', e => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      const id = e.dataTransfer.getData('text/plain');
+      const t = getTask(id);
+      if (t && t.status !== status) {
+        t.status = status;
+        saveState();
+        render();
+      }
+    });
+
+    board.appendChild(col);
+  });
+}
+
+function buildTaskCard(task) {
+  const card = document.createElement('div');
+  card.className = 'task-card card-' + task.status;
+  card.draggable = true;
+
+  const parent = task.parentId ? getTask(task.parentId) : null;
+  const kids = getChildren(task.id);
+  const doneKids = kids.filter(k => k.status === 'done').length;
+  const overdue = task.status !== 'done' && task.endDate && task.endDate < todayISO();
+
+  let html = '';
+  if (parent) html += `<div class="card-parent">&#8627; ${escHtml(parent.name)}</div>`;
+  html += `<div class="card-title">${escHtml(task.name)}</div>`;
+  html += '<div class="card-meta">';
+  if (task.assignee) html += `<span class="card-avatar" title="${escHtml(task.assignee)}">${escHtml(initials(task.assignee))}</span>`;
+  if (task.startDate && task.endDate) {
+    html += `<span class="card-dates${overdue ? ' overdue' : ''}" title="${task.startDate} → ${task.endDate}">${fmtShortDate(task.startDate)} – ${fmtShortDate(task.endDate)}${overdue ? ' ⚠' : ''}</span>`;
+  }
+  if (kids.length) html += `<span class="card-chip">${doneKids}/${kids.length} subtasks</span>`;
+  if (task.dependsOn.length) html += `<span class="card-chip" title="Has dependencies">&#128279; ${task.dependsOn.length}</span>`;
+  html += '</div>';
+  card.innerHTML = html;
+
+  card.addEventListener('click', () => openEditModal(task.id));
+  card.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', task.id);
+    e.dataTransfer.effectAllowed = 'move';
+    card.classList.add('dragging');
+  });
+  card.addEventListener('dragend', () => card.classList.remove('dragging'));
+
+  return card;
 }
 
 // ═══════════════════════════════════════════════════
@@ -1290,31 +1562,21 @@ function exportToExcel() {
 // ═══════════════════════════════════════════════════
 function setView(v) {
   currentView = v;
-  const listDiv  = document.getElementById('list-view');
-  const ganttDiv = document.getElementById('gantt-view');
-  const zoomDiv  = document.getElementById('gantt-zoom');
-  const btnList  = document.getElementById('btn-list-view');
-  const btnGantt = document.getElementById('btn-gantt-view');
-
-  if (v === 'list') {
-    listDiv.style.display  = 'block';
-    ganttDiv.style.display = 'none';
-    zoomDiv.style.display  = 'none';
-    btnList.classList.add('active');
-    btnGantt.classList.remove('active');
-  } else {
-    listDiv.style.display  = 'none';
-    ganttDiv.style.display = 'block';
-    zoomDiv.style.display  = 'flex';
-    btnList.classList.remove('active');
-    btnGantt.classList.add('active');
-  }
+  document.getElementById('list-view').style.display  = v === 'list'  ? 'block' : 'none';
+  document.getElementById('cards-view').style.display = v === 'cards' ? 'block' : 'none';
+  document.getElementById('gantt-view').style.display = v === 'gantt' ? 'block' : 'none';
+  document.getElementById('gantt-zoom').style.display = v === 'gantt' ? 'flex'  : 'none';
+  document.getElementById('btn-list-view').classList.toggle('active',  v === 'list');
+  document.getElementById('btn-cards-view').classList.toggle('active', v === 'cards');
+  document.getElementById('btn-gantt-view').classList.toggle('active', v === 'gantt');
   render();
 }
 
 function render() {
   if (currentView === 'list') {
     renderListView();
+  } else if (currentView === 'cards') {
+    renderCardsView();
   } else {
     renderGanttView();
   }
@@ -1324,6 +1586,7 @@ function render() {
 //  EVENT LISTENERS
 // ═══════════════════════════════════════════════════
 document.getElementById('btn-list-view').addEventListener('click', () => setView('list'));
+document.getElementById('btn-cards-view').addEventListener('click', () => setView('cards'));
 document.getElementById('btn-gantt-view').addEventListener('click', () => setView('gantt'));
 document.getElementById('btn-add-task').addEventListener('click', () => openAddModal(null));
 document.getElementById('btn-export').addEventListener('click', exportToExcel);
